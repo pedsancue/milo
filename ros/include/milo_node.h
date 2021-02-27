@@ -19,51 +19,80 @@
 //  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //---------------------------------------------------------------------------------------------------------------------
 
-#ifndef MILO_TELLO_COMMAND_H_
-#define MILO_TELLO_COMMAND_H_
+#ifndef MILO_NODE_H_
+#define MILO_NODE_H_
 
-#include "milo/driver/sockets/CommandSocket.h"
+#include <ros/ros.h>
+#include <ros/xmlrpc_manager.h>
 
-namespace milo{
-    class TelloCommand
-    {
-        public:
-            TelloCommand(std::string _ip, int _port);
+#include <signal.h>
 
-            ~TelloCommand();
+#include <tf/tf.h>
 
-            bool isInit();
+#include <std_msgs/String.h>
+#include <std_msgs/Int32MultiArray.h>
+#include <sensor_msgs/Imu.h> 
+#include <sensor_msgs/BatteryState.h> 
+#include <geometry_msgs/PoseStamped.h> 
+ 
+#include <sensor_msgs/Image.h> 
+#include <sensor_msgs/image_encodings.h>
+#include <image_transport/image_transport.h>
+#include <cv_bridge/cv_bridge.h>
 
-            bool isReceiving();
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
 
-            bool isWaiting();
+#include <std_srvs/SetBool.h>
 
-            bool isRespond();
+#include "milo/milo.h"
 
-            void timeout();
 
-            float timeSendRecv();
+class MiloNode
+{
+    public:
+        enum class eState{
+            WAIT,
+            LAND,
+            TAKEOFF,
+            RC,
+            EXIT
+        };
+        
+        MiloNode(){};
+        ~MiloNode(){};
 
-            float timeFromLastRecv();
+        bool init();
 
-            void setControl();
+        bool run();
 
-            void setCamera(bool _enable);
+        bool finalize();
 
-            void rc_control(int _roll, int _pitch, int _throttle, int _yaw);
+    private:
+        bool landService(std_srvs::SetBool::Request &_req, std_srvs::SetBool::Response &_res);
 
-            void move(std::string _dir, int _dist);
+        bool takeoffService(std_srvs::SetBool::Request &_req, std_srvs::SetBool::Response &_res);
 
-            void rotate(std::string _dir, int _angle);
+        void rcCallback(const std_msgs::Int32MultiArray::ConstPtr& _msg);
 
-            void send(std::string _cmd);
+    private:
+        bool telemetryThread();
 
-        private:
-            CommandSocket *commandSocket_ = nullptr;
+        bool cameraThread();
 
-            std::mutex mtx_;    
+    private:
+        eState state_;
 
-    };
-}
+        milo::MILO *drone_ = nullptr;
+
+        std::thread telemThread_, camThread_;
+
+        ros::Publisher statusPub_, imuPub_, batPub_, angHeightPub_, imagePub_;
+        ros::Subscriber rcSub_;
+        ros::ServiceServer landSrv_, takeoffSrv_;
+
+        bool fin_ = false;
+
+};
 
 #endif
